@@ -1,4 +1,4 @@
-Source,Target,Weight
+Node1,Node2,Weight
 0,1,2
 0,2,3
 0,3,6
