@@ -1,0 +1,139 @@
+import pandas as pd
+import numpy as np
+import heapq
+import networkx as nx
+import matplotlib.pyplot as plt
+import ipywidgets as widgets
+from IPython.display import display
+
+# Function to read CSV data from GitHub
+def read_csv_from_github(file_url):
+    df = pd.read_csv(file_url)
+    return df
+
+# Class for the Graph data structure
+class Graph:
+    def __init__(self, vertices):
+        self.vertices = vertices
+        self.graph = {v: [] for v in range(vertices)}
+
+    def add_edge(self, u, v, weight):
+        self.graph[u].append((v, weight))
+        self.graph[v].append((u, weight))
+
+#Find Vertex associated with least weighted edge
+def vertex_with_least_weight_edge(graph):
+    min_weight = float('inf')
+    min_weight_vertex = None
+
+    for vertex in graph.graph:
+        for neighbor, weight in graph.graph[vertex]:
+            if weight < min_weight:
+                min_weight = weight
+                min_weight_vertex = vertex
+
+    return min_weight_vertex
+
+
+# Modified Prim's algorithm
+def mst_modified_prim(graph, start_vertex):
+    jet = [float('inf')] * graph.vertices
+    parent = [None] * graph.vertices
+    visited = [False] * graph.vertices
+
+    jet[start_vertex] = 0
+    pq = [(0, start_vertex)]
+
+    while pq:
+        current_weight, current_vertex = heapq.heappop(pq)
+        visited[current_vertex] = True
+
+        for neighbor, weight in graph.graph[current_vertex]:
+            if not visited[neighbor] and weight < jet[neighbor]:
+                jet[neighbor] = weight
+                parent[neighbor] = current_vertex
+                heapq.heappush(pq, (weight, neighbor))
+
+    return parent, jet
+
+# Function to build the original graph
+def build_original_graph(df):
+    G_original = nx.Graph()
+    for _, row in df.iterrows():
+        G_original.add_edge(row['Source'], row['Target'], weight=row['Weight'])
+    return G_original
+
+# Function to visualize the graph
+def visualize_graph(G, title):
+    pos = nx.spring_layout(G)
+    edge_labels = {(i, j): w['weight'] for i, j, w in G.edges(data=True)}
+
+    nx.draw(G, pos, with_labels=True, font_weight='bold', node_size=700, node_color='skyblue', font_color='black', font_size=10, edge_color='gray')
+    nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+    plt.title(title)
+    plt.show()
+
+# Function to visualize the minimum spanning tree as a tree
+def visualize_mst_tree(G_mst):
+    pos = nx.drawing.nx_pydot.graphviz_layout(G_mst, prog="dot")
+    edge_labels = {(i, j): w['weight'] for i, j, w in G_mst.edges(data=True)}
+
+    nx.draw(G_mst, pos, with_labels=True, font_weight='bold', node_size=700, node_color='lightgreen', font_color='black', font_size=10, edge_color='gray', connectionstyle='arc3,rad=0.1')
+    nx.draw_networkx_edge_labels(G_mst, pos, edge_labels=edge_labels)
+    plt.title("Minimum Spanning Tree (Tree View)")
+    plt.show()
+
+# Main function to run the algorithm and display the GUI
+def main(file_url):
+    # Read CSV data from GitHub
+    df = read_csv_from_github(file_url)
+
+    # Build the original graph
+    G_original = build_original_graph(df)
+
+    # Build the graph data structure for the algorithm
+    num_vertices = max(df['Source'].max(), df['Target'].max()) + 1
+    graph = Graph(num_vertices)
+
+    for _, row in df.iterrows():
+        graph.add_edge(row['Source'], row['Target'], row['Weight'])
+
+    # Create the Modified Prim's algorithm
+    start_vertex = vertex_with_least_weight_edge(graph)
+    parent, jet = mst_modified_prim(graph, start_vertex)
+
+    # Build the Minimum Spanning Tree graph
+    G_mst = nx.Graph()
+    for v in range(0, len(parent)):
+      if v!=start_vertex:
+        G_mst.add_edge(parent[v], v, weight=jet[v])
+
+    # Display GUI with tabs
+    tab_layout = widgets.Tab()
+
+    # Tab 1: Edge Information (Table)
+    edge_info_widget = widgets.Output()
+    with edge_info_widget:
+        display(df)
+    tab_layout.set_title(0, 'Edge Information')
+    tab_layout.children = (edge_info_widget,)
+
+    # Tab 2: Original Graph Visualization
+    original_graph_widget = widgets.Output()
+    with original_graph_widget:
+        visualize_graph(G_original, "Original Graph")
+    tab_layout.set_title(1, 'Original Graph')
+    tab_layout.children += (original_graph_widget,)
+
+    # Tab 3: Minimum Spanning Tree (Tree View)
+    mst_tree_widget = widgets.Output()
+    with mst_tree_widget:
+        visualize_mst_tree(G_mst)
+    tab_layout.set_title(2, 'Minimum Spanning Tree (Tree View)')
+    tab_layout.children += (mst_tree_widget,)
+
+    display(tab_layout)
+
+# Replace 'your_file_url' with the actual GitHub raw CSV file URL
+file_url = '1.csv'
+main(file_url)
